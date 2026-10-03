@@ -1,8 +1,11 @@
 import prisma from "../config/database.js";
+import { generateAccessToken } from "../utils/jwt.js";
 import {
-  generateAccessToken,
-  generateRefreshToken,
-} from "../utils/jwt.js";
+  createRefreshSession,
+  rotateRefreshToken,
+  revokeRefreshToken,
+  revokeAllUserRefreshTokens,
+} from "./session.service.js";
 import {
   hashPassword,
   comparePassword,
@@ -14,44 +17,42 @@ const sanitizeUser = (user) => {
   return safeUser;
 };
 
-export const registerUser = async ({
-  name,
-  username,
-  email,
-  password,
-}) => {
+export const registerUser = async (data) => {
   const existingUser = await prisma.user.findFirst({
     where: {
       OR: [
-        { email },
-        { username },
+        { email: data.email },
+        { username: data.username },
       ],
     },
   });
 
   if (existingUser) {
-    if (existingUser.email === email) {
+    if (existingUser.email === data.email) {
       throw new Error("Email is already registered");
     }
 
-    if (existingUser.username === username) {
+    if (existingUser.username === data.username) {
       throw new Error("Username is already taken");
     }
   }
 
-  const passwordHash = await hashPassword(password);
+  const passwordHash = await hashPassword(data.password);
 
   const user = await prisma.user.create({
     data: {
-      name,
-      username,
-      email,
+      name: data.name,
+      username: data.username,
+      email: data.email,
       passwordHash,
     },
   });
 
   const accessToken = generateAccessToken(user);
-  const refreshToken = generateRefreshToken(user);
+
+  const refreshToken = await createRefreshSession(
+    user.id
+  );
 
   return {
     user: sanitizeUser(user),
@@ -60,13 +61,10 @@ export const registerUser = async ({
   };
 };
 
-export const loginUser = async ({
-  email,
-  password,
-}) => {
+export const loginUser = async (data) => {
   const user = await prisma.user.findUnique({
     where: {
-      email,
+      email: data.email,
     },
   });
 
@@ -75,7 +73,7 @@ export const loginUser = async ({
   }
 
   const passwordValid = await comparePassword(
-    password,
+    data.password,
     user.passwordHash
   );
 
@@ -84,7 +82,10 @@ export const loginUser = async ({
   }
 
   const accessToken = generateAccessToken(user);
-  const refreshToken = generateRefreshToken(user);
+
+  const refreshToken = await createRefreshSession(
+    user.id
+  );
 
   return {
     user: sanitizeUser(user),
@@ -105,4 +106,27 @@ export const getCurrentUser = async (userId) => {
   }
 
   return sanitizeUser(user);
+};
+
+export const refreshAccessToken = async (refreshToken) => {
+  const result = await rotateRefreshToken(refreshToken);
+
+  const accessToken = generateAccessToken(
+    result.user
+  );
+
+  return {
+    user: sanitizeUser(result.user),
+    accessToken,
+    refreshToken: result.refreshToken,
+  };
+};
+
+
+export const logoutUser = async (refreshToken) => {
+  await revokeRefreshToken(refreshToken);
+};
+
+export const logoutAllDevices = async (userId) => {
+  await revokeAllUserRefreshTokens(userId);
 };

@@ -4,6 +4,9 @@ import {
   register,
   login,
   me,
+  refresh,
+  logout,
+  logoutAll,
 } from "../controllers/auth.controller.js";
 
 import { authenticate } from "../middleware/auth.middleware.js";
@@ -14,6 +17,20 @@ router.post("/register", register);
 
 router.post("/login", login);
 
-router.get("/me", authenticate, me);
+router.post("/refresh", refresh);
+
+router.post("/logout", logout);
+
+router.post(
+  "/logout-all",
+  authenticate,
+  logoutAll
+);
+
+router.get(
+  "/me",
+  authenticate,
+  me
+);
 
 export default router;

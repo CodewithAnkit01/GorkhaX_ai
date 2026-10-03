@@ -2,6 +2,9 @@ import {
   registerUser,
   loginUser,
   getCurrentUser,
+  refreshAccessToken,
+  logoutUser,
+  logoutAllDevices,
 } from "../services/auth.service.js";
 
 import {
@@ -50,6 +53,53 @@ export const me = async (req, res, next) => {
       data: {
         user,
       },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const refresh = async (req, res, next) => {
+  try {
+    const { refreshToken } = req.body;
+
+    if (!refreshToken) {
+      return res.status(400).json({
+        success: false,
+        message: "Refresh token is required",
+      });
+    }
+
+    const result = await refreshAccessToken(
+      refreshToken
+    );
+
+    res.status(200).json({
+      success: true,
+      message: "Token refreshed successfully",
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const logout = async (req, res, next) => {
+  try {
+    const { refreshToken } = req.body;
+
+    if (!refreshToken) {
+      return res.status(400).json({
+        success: false,
+        message: "Refresh token is required",
+      });
+    }
+
+    await logoutUser(refreshToken);
+
+    res.status(200).json({
+      success: true,
+      message: "Logged out successfully",
     });
   } catch (error) {
     next(error);
